@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ec
+  labels:
+    name: echo
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: echo-config
+  namespace: ec
+data:
+  debug.level: info
+ 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-app
+  namespace: ec
+spec:
+  replicas: 2
+  selector:
+      matchLabels:
+        app: echo-app
+  template:
+    metadata:
+      labels:
+        app: echo-app
+    spec:
+      containers:
+      - name: echo
+        image: learnk8s/kubernetes-challenge:latest
+        imagePullPolicy: Never
+        env:
+          - name: CONFIG-ENV-DEBUG
+            valueFrom:
+              configMapKeyRef:
+                name: echo-config
+                key: debug.level
+        ports:
+        - containerPort: 4000
+        volumeMounts:
+        - name: echo-config-file
+          readOnly: true
+          mountPath: /app/config
+      volumes:
+        - name: echo-config-file
+          configMap:
+            name: echo-config
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-service
+  namespace: ec
+spec:
+  type: LoadBalancer
+  selector:
+    app: echo-app
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 4000
+    nodePort: 30400
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: echo-ingress
+  namespace: ec
+spec:
+  rules:
+  - host: echoapp.com
+    http:
+      paths:
+      - backend:
+          serviceName: echo-service
+          servicePort: 80
